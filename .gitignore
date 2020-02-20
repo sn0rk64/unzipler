@@ -1,0 +1,5 @@
+assets/files/*
+!assets/files/.gitkeep
+assets/archives/*
+!assets/archives/.gitkeep
+.idea
