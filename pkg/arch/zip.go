@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unzipler/configs/env"
 )
 
 const DEST = "./assets/files"
+
+var conf = env.New()
 
 var garbage = []string{
 	"__MACOSX",
@@ -123,6 +126,8 @@ func fillResource(rs *resource, fpath string, dest string) {
 	if _, ok := (*rs)[dir]; !ok {
 		(*rs)[dir] = make(map[string]FileInfo)
 	}
+
+	fpath = conf.Host + "/" + strings.Replace(fpath, "assets/", "", 1)
 
 	(*rs)[dir][fname] = FileInfo{
 		Path: fpath,

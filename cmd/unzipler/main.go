@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"unzipler/internal/utils"
 	"unzipler/pkg/arch"
 )
@@ -18,6 +23,7 @@ func main() {
 
 	router.HandleFunc("/", index)
 	router.HandleFunc("/handleArchive", handleArchive)
+	router.HandleFunc("/files/", handleFiles)
 
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Could not start server: %s\n", err.Error())
@@ -25,7 +31,38 @@ func main() {
 }
 
 func index(w http.ResponseWriter, _ *http.Request) {
-	w.Write([]byte{})
+	notFound(w)
+}
+
+func handleFiles(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		p := strings.TrimPrefix(r.URL.Path, "/files/")
+		p = "./assets/files/" + p
+
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			notFound(w)
+			return
+		}
+
+		streamBytes, err := ioutil.ReadFile(p)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		b := bytes.NewBuffer(streamBytes)
+
+		ctype := http.DetectContentType(streamBytes[:512])
+		w.Header().Set("Content-type", ctype)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		if _, err := b.WriteTo(w); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		notAllowed(w)
+	}
 }
 
 func handleArchive(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +72,7 @@ func handleArchive(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		fname = strings.TrimSuffix(fname, filepath.Ext(fname))
 		a := arch.New(fpath, fname)
 		tree, err := a.Unzip()
 		if err != nil {
@@ -45,12 +83,16 @@ func handleArchive(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		json.NewEncoder(w).Encode(tree)
 	default:
-		notFound(w)
+		notAllowed(w)
 	}
 }
 
 func notFound(w http.ResponseWriter) {
 	error(w, "404 page not found", http.StatusNotFound)
+}
+
+func notAllowed(w http.ResponseWriter) {
+	error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 }
 
 func error(w http.ResponseWriter, error string, code int) {
